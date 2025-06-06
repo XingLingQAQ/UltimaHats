@@ -40,9 +40,11 @@
 #
 # If the item is a BANNER:
 # First, make sure the item name is colored, e.g. GREEN_BANNER
-# Next, go to your favorite banner generator site and find the /give code
-# Then, copy the code from where it says "Patterns:" to the end.
+# Next, go to your favorite banner generator site and find the /give command.
+# You will see a section saying "banner_patterns=" to the end.
 # Include this in the head config as patterns: "[paste here]"
+# If the banner pattern has double quotes in it, surround the patterns with
+# single quotes and vice versa
 #
 # Note that banners and playerheads don't support the glow option
 # Examples of blocks, banners, and playerheads can all be found below!
@@ -75,9 +77,10 @@ animated_slime:
       time: 10
       
 # A cool banner
+# Notice the single quotes around the pattern section, due to the double quotes inside it
 banner:
   item: BLUE_BANNER
-  patterns: "Patterns:[{Pattern:gra,Color:14},{Pattern:ss,Color:15},{Pattern:cbo,Color:15}]"
+  patterns: '[{pattern:"gradient",color:"red"},{pattern:"small_stripes",color:"black"},{pattern:"curly_border",color:"black"}]'
   name: "&9&lPVP God"
   lore:
     - ""

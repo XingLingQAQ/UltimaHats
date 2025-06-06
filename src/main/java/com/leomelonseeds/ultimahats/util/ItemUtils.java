@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
 import org.bukkit.Bukkit;
 import org.bukkit.DyeColor;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.block.banner.PatternType;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -33,6 +34,8 @@ import com.leomelonseeds.ultimahats.wearer.AnimatedWearer;
 import com.leomelonseeds.ultimahats.wearer.Wearer;
 import com.leomelonseeds.ultimahats.wearer.WearerManager;
 
+import io.papermc.paper.registry.RegistryAccess;
+import io.papermc.paper.registry.RegistryKey;
 import me.clip.placeholderapi.PlaceholderAPI;
 
 public class ItemUtils {
@@ -70,12 +73,13 @@ public class ItemUtils {
         ConfigurationSection section = ConfigUtils.getConfigFile("hats.yml").getConfigurationSection(hat);
         
         // Check if player is already wearing a thing
-        if (!wm.isWearing(player) && player.getInventory().getHelmet() != null) {
+        ItemStack helmet = player.getInventory().getHelmet();
+        boolean isHeadFree = helmet == null || helmet.getAmount() == 0;
+        if (!wm.isWearing(player) && !isHeadFree) {
             if (!UltimaHats.getPlugin().getConfig().getBoolean("force-remove-helmets")) {
                 player.sendMessage(ConfigUtils.getString("armor-equipped", player));
                 return false;
             } else {
-                ItemStack helmet = player.getInventory().getHelmet();
                 HashMap<Integer, ItemStack> extra = player.getInventory().addItem(helmet);
                 if (!extra.isEmpty()) {
                     player.getWorld().dropItem(player.getLocation(), helmet);
@@ -397,17 +401,30 @@ public class ItemUtils {
         // Add banner patterns if necessary
         if (material.toString().contains("BANNER")) {
             BannerMeta bannerMeta = (BannerMeta) meta;
-            String patterns = section.getString("patterns");
-            Pattern regex = Pattern.compile("Pattern:(\\w+),Color:(\\d+)");
-            Matcher matcher = regex.matcher(patterns);
-            while (matcher.find()) {
-                String bannerPattern = matcher.group(1);
-                String color = matcher.group(2);
-                byte dyeColor = Byte.parseByte(color);
-                bannerMeta.addPattern(new org.bukkit.block.banner.Pattern(DyeColor.getByWoolData(dyeColor), 
-                        PatternType.getByIdentifier(bannerPattern)));
+            String patterns = section.getString("patterns").toLowerCase().replaceAll("\\s+","");
+            Pattern layerRegex = Pattern.compile("\\{.+?\\}");
+            Pattern patternRegex = Pattern.compile("pattern:\"?(minecraft:)?(\\w+?)\"?(,|})");
+            Pattern colorRegex = Pattern.compile("color:\"?(\\w+?)\"?(,|})");
+            Matcher layerMatcher = layerRegex.matcher(patterns);
+            while (layerMatcher.find()) {
+                String layer = layerMatcher.group();
+                Matcher patternMatcher = patternRegex.matcher(layer);
+                Matcher colorMatcher = colorRegex.matcher(layer);
+                if (!patternMatcher.find() || !colorMatcher.find()) {
+                    Bukkit.getLogger().log(Level.WARNING, "Hat '" + section.getName() + "' has an invalid banner pattern!");
+                    break;
+                }
+                String patternStr = patternMatcher.group(2);
+                String color = colorMatcher.group(1).toUpperCase();
+                PatternType bannerPattern = RegistryAccess.registryAccess().
+                        getRegistry(RegistryKey.BANNER_PATTERN).get(NamespacedKey.minecraft(patternStr));
+                if (bannerPattern == null) {
+                    Bukkit.getLogger().log(Level.WARNING, "Hat '" + section.getName() + "' has an invalid banner pattern!");
+                    break;
+                }
+                bannerMeta.addPattern(new org.bukkit.block.banner.Pattern(DyeColor.valueOf(color), bannerPattern));
             }
-            bannerMeta.addItemFlags(ItemFlag.HIDE_POTION_EFFECTS);
+            bannerMeta.addItemFlags(ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
         }
         
         // Add glow if exists
@@ -416,7 +433,7 @@ public class ItemUtils {
             glow = section.getParent().getParent().getBoolean("glow");
         }
         if (glow) {
-            meta.addEnchant(Enchantment.DURABILITY, 1, true);
+            meta.addEnchant(Enchantment.UNBREAKING, 1, true);
             meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
         }
         
